@@ -36,11 +36,45 @@ class ReviewRepositoryTest {
   @Autowired
   private TestEntityManager testEntityManager;
 
+  @BeforeEach
+  void beforeEach() {
+    assertEquals(0, cut.count());
+  }
+
   @Test
   void notNull() throws SQLException {
+    assertNotNull(entityManager);
+    assertNotNull(testEntityManager);
+    assertNotNull(cut);
+    assertNotNull(dataSource);
+
+    System.out.println(dataSource.getConnection().getMetaData().getDatabaseProductName());
+
+    Review review = new Review();
+    review.setTitle("Review 101");
+    review.setContent("Good review");
+    review.setCreatedAt(LocalDateTime.now());
+    review.setRating(5);
+    review.setBook(null);
+    review.setUser(null);
+
+    Review result = cut.save(review);
+
+    assertNotNull(result.getId());
   }
 
   @Test
   void transactionalSupportTest() {
+    Review review = new Review();
+    review.setTitle("Review 101");
+    review.setContent("Good review");
+    review.setCreatedAt(LocalDateTime.now());
+    review.setRating(5);
+    review.setBook(null);
+    review.setUser(null);
+
+    Review result = cut.save(review);
+
+    assertNotNull(result.getId());
   }
 }
