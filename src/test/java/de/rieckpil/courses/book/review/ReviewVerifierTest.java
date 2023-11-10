@@ -47,6 +47,8 @@ class ReviewVerifierTest {
   @ParameterizedTest
   @CsvFileSource(resources = "/badReview.csv")
   void shouldFailWhenReviewIsOfBadQuality(String review) {
+    boolean result = reviewVerifier.doesMeetQualityStandards(review);
+    assertFalse(result, "ReviewVerifier did not detect bad review");
   }
 
   @RepeatedTest(5)
