@@ -1,5 +1,8 @@
 package de.rieckpil.courses.book.review;
 
+import org.assertj.core.api.Assertions;
+import org.hamcrest.MatcherAssert;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
@@ -67,9 +70,19 @@ class ReviewVerifierTest {
 
   @Test
   void shouldPassWhenReviewIsGoodHamcrest() {
+    String review = "I can totally recommend this book who is interested in learning how to write Java code!";
+    boolean result = reviewVerifier.doesMeetQualityStandards(review);
+
+    MatcherAssert.assertThat("ReviewVerifier did not detect good review", result, Matchers.equalTo(true));
   }
 
   @Test
   void shouldPassWhenReviewIsGoodAssertJ() {
+    String review = "I can totally recommend this book who is interested in learning how to write Java code!";
+    boolean result = reviewVerifier.doesMeetQualityStandards(review);
+
+    Assertions.assertThat(result)
+      .withFailMessage("ReviewVerifier did not detect good review")
+      .isTrue();
   }
 }
