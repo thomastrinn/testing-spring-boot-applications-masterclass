@@ -4,7 +4,6 @@ import de.rieckpil.courses.book.management.Book;
 import de.rieckpil.courses.book.management.BookRepository;
 import de.rieckpil.courses.book.management.User;
 import de.rieckpil.courses.book.management.UserService;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatchers;
@@ -16,10 +15,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class ReviewServiceTest {
+class  ReviewServiceTest {
 
   @Mock
-  private ReviewVerifier mockedReviewVerifier;
+  private ReviewVerifier reviewVerifier;
 
   @Mock
   private UserService userService;
@@ -39,18 +38,61 @@ class ReviewServiceTest {
 
   @Test
   void shouldNotBeNull() {
+    assertNotNull(reviewRepository);
+    assertNotNull(reviewVerifier);
+    assertNotNull(userService);
+    assertNotNull(bookRepository);
+    assertNotNull(cut);
   }
 
   @Test
-  @DisplayName("Write english sentence")
   void shouldThrowExceptionWhenReviewedBookIsNotExisting() {
+    when(bookRepository.findByIsbn(ISBN)).thenReturn(null);
+
+    BookReviewRequest bookReviewRequest =
+      new BookReviewRequest("Title", "Content", 3);
+
+    assertThrows(IllegalArgumentException.class, () -> {
+      cut.createBookReview(ISBN, bookReviewRequest, USERNAME, EMAIL);
+    });
   }
 
   @Test
   void shouldRejectReviewWhenReviewQualityIsBad() {
+    BookReviewRequest bookReviewRequest =
+      new BookReviewRequest("Title", "BADCONTENT!", 1);
+
+    when(bookRepository.findByIsbn(ISBN))
+      .thenReturn(new Book());
+    when(reviewVerifier.doesMeetQualityStandards(bookReviewRequest.getReviewContent()))
+      .thenReturn(false);
+
+    assertThrows(BadReviewQualityException.class, () -> {
+      cut.createBookReview(ISBN, bookReviewRequest, USERNAME, EMAIL);
+    });
+
+    verify(reviewRepository, times(0)).save(ArgumentMatchers.any(Review.class));
   }
 
   @Test
   void shouldStoreReviewWhenReviewQualityIsGoodAndBookIsPresent() {
+    BookReviewRequest bookReviewRequest =
+      new BookReviewRequest("Title", "GOOD CONTENT!", 5);
+
+    when(bookRepository.findByIsbn(ISBN))
+      .thenReturn(new Book());
+    when(reviewVerifier.doesMeetQualityStandards(bookReviewRequest.getReviewContent()))
+      .thenReturn(true);
+    when(userService.getOrCreateUser(USERNAME, EMAIL))
+      .thenReturn(new User());
+    when(reviewRepository.save(any(Review.class))).thenAnswer(invocation -> {
+      Review review = invocation.getArgument(0);
+      review.setId(42L);
+      return review;
+    });
+
+    Long result = cut.createBookReview(ISBN, bookReviewRequest, USERNAME, EMAIL);
+
+    assertEquals(42, result);
   }
 }

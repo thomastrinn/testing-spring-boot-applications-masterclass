@@ -9,6 +9,7 @@ import de.rieckpil.courses.book.management.UserService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -32,6 +33,10 @@ public class ReviewService {
   }
 
   public Long createBookReview(String isbn, BookReviewRequest bookReviewRequest, String userName, String email) {
+    Assert.notNull(isbn, "ISBN can not be null");
+    Assert.notNull(bookReviewRequest, "request can not be null");
+    Assert.notNull(userName, "user name can not be null");
+    Assert.notNull(email, "email can not be null");
 
     Book book = bookRepository.findByIsbn(isbn);
 
