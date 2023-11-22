@@ -4,6 +4,7 @@ import io.awspring.cloud.autoconfigure.core.AwsAutoConfiguration;
 import io.awspring.cloud.autoconfigure.core.CredentialsProviderAutoConfiguration;
 import io.awspring.cloud.autoconfigure.core.RegionProviderAutoConfiguration;
 import io.awspring.cloud.autoconfigure.sqs.SqsAutoConfiguration;
+import io.awspring.cloud.sqs.operations.SqsTemplate;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,7 +26,12 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
+import static org.awaitility.Awaitility.given;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testcontainers.containers.localstack.LocalStackContainer.Service.SQS;
 
 @ExtendWith(SpringExtension.class)
@@ -75,11 +81,23 @@ class BookSynchronizationListenerSliceTest {
   @MockBean
   private OpenLibraryApiClient openLibraryApiClient;
 
+  @Autowired
+  private SqsTemplate sqsTemplate;
+
   @Test
   void shouldStartSQS() {
+    assertNotNull(cut);
   }
 
   @Test
   void shouldConsumeMessageWhenPayloadIsCorrect() {
+    sqsTemplate.send(QUEUE_NAME, new BookSynchronization(ISBN));
+
+    when(bookRepository.findByIsbn(ISBN)).thenReturn(new Book());
+
+    given()
+      .await()
+      .atMost(5, TimeUnit.SECONDS)
+      .untilAsserted(() -> verify(bookRepository).findByIsbn(ISBN));
   }
 }
