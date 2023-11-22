@@ -44,7 +44,7 @@ public class WireMockInitializer implements ApplicationContextInitializer<Config
 
       TestPropertyValues
         .of(
-          "spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost:" + wireMockServer.port() + "/auth/realms/spring"
+          "spring.security.oauth2.resourceserver.jwt.issuer-uri=" + wireMockServer.baseUrl() + "/auth/realms/spring"
         ).applyTo(applicationContext);
 
     } else if (Arrays.asList(applicationContext.getEnvironment().getActiveProfiles()).contains("web-test")) {

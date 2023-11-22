@@ -42,10 +42,10 @@ public class OAuth2Stubs {
   }
 
   public String getIssuerUri() {
-    return "http://localhost:" + wireMockServer.port() + "/auth/realms/spring";
+    return wireMockServer.baseUrl() + "/auth/realms/spring";
   }
 
   private String getJWKSUri() {
-    return "http://localhost:" + wireMockServer.port() + "/jwks";
+    return wireMockServer.baseUrl() + "/jwks";
   }
 }
