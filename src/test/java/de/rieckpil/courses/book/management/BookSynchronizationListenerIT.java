@@ -11,8 +11,8 @@ import de.rieckpil.courses.initializer.RSAKeyGenerator;
 import de.rieckpil.courses.initializer.WireMockInitializer;
 import de.rieckpil.courses.stubs.OAuth2Stubs;
 import de.rieckpil.courses.stubs.OpenLibraryStubs;
-import io.awspring.cloud.sqs.operations.SqsTemplate;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -27,15 +27,16 @@ import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+import software.amazon.awssdk.services.sqs.SqsAsyncClient;
+import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 import static org.testcontainers.containers.localstack.LocalStackContainer.Service.SQS;
+import static org.testcontainers.shaded.org.awaitility.Awaitility.given;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("integration-test")
@@ -56,6 +57,20 @@ class BookSynchronizationListenerIT {
   // .withEnv("DEFAULT_REGION", "eu-central-1");
 
   protected static final String QUEUE_NAME = UUID.randomUUID().toString();
+  private static final String ISBN = "9780596004651";
+  private static String VALID_RESPONSE;
+
+  static {
+    try {
+      VALID_RESPONSE = new String(Objects.requireNonNull(
+          OpenLibraryApiClientTest.class.getClassLoader()
+            .getResourceAsStream("stubs/openlibrary/success-" + ISBN + ".json"))
+        .readAllBytes()
+      );
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
 
   @BeforeAll
   static void beforeAll() throws IOException, InterruptedException {
@@ -83,13 +98,18 @@ class BookSynchronizationListenerIT {
   private OAuth2Stubs oAuth2Stubs;
 
   @Autowired
-  private SqsTemplate sqsTemplate;
+  private SqsAsyncClient sqsClient;
 
   @Autowired
   private OpenLibraryStubs openLibraryStubs;
 
   @Autowired
   private BookRepository bookRepository;
+
+  @BeforeEach
+  public void cleanUp() {
+    bookRepository.deleteAll();
+  }
 
   @Test
   void shouldGetSuccessWhenClientIsAuthenticated() throws JOSEException {
@@ -124,5 +144,43 @@ class BookSynchronizationListenerIT {
 
   @Test
   void shouldReturnBookFromAPIWhenApplicationConsumesNewSyncRequest() {
+    // VALIDATE no books are present
+    webTestClient
+      .get()
+      .uri("/api/books")
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody().jsonPath("$.size()").isEqualTo(0);
+
+    // ARANGE
+    openLibraryStubs.stubForSuccessfulBookResponse(ISBN, VALID_RESPONSE);
+
+    // ACT
+    sqsClient.sendMessage(
+        SendMessageRequest.builder()
+            .queueUrl(this.sqsClient.getQueueUrl(r -> r.queueName(QUEUE_NAME)).join().queueUrl())
+            .messageBody(
+                """
+                  {
+                    "isbn": "%s"
+                  }
+                """.formatted(ISBN))
+                    .build());
+
+    // ASSERT
+    given()
+        .atMost(Duration.ofSeconds(5))
+        .await()
+        .untilAsserted(
+            () -> {
+              this.webTestClient
+                  .get()
+                  .uri("/api/books")
+                  .exchange()
+                  .expectStatus().isOk()
+                  .expectBody()
+                  .jsonPath("$.size()").isEqualTo(1)
+                  .jsonPath("$[0].isbn").isEqualTo(ISBN);
+            });
   }
 }
