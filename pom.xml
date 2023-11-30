@@ -20,7 +20,7 @@
     <java.version>17</java.version>
     <node.version>v16.13.0</node.version>
     <spring-cloud-aws.version>3.0.0-RC2</spring-cloud-aws.version>
-    <testcontainers.version>1.17.6</testcontainers.version>
+    <testcontainers.version>1.19.1</testcontainers.version>
     <wiremock.version>2.35.0</wiremock.version>
     <awaitility.version>4.2.0</awaitility.version>
     <p6spy.version>3.9.1</p6spy.version>
@@ -32,16 +32,16 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>io.awspring.cloud</groupId>
-        <artifactId>spring-cloud-aws-dependencies</artifactId>
-        <version>${spring-cloud-aws.version}</version>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers-bom</artifactId>
+        <version>${testcontainers.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
-        <groupId>org.testcontainers</groupId>
-        <artifactId>testcontainers-bom</artifactId>
-        <version>${testcontainers.version}</version>
+        <groupId>io.awspring.cloud</groupId>
+        <artifactId>spring-cloud-aws-dependencies</artifactId>
+        <version>${spring-cloud-aws.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
