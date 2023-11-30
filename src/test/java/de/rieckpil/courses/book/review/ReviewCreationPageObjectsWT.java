@@ -11,7 +11,6 @@ import de.rieckpil.courses.pages.NewReviewPage;
 import de.rieckpil.courses.pages.ReviewListPage;
 import org.apache.commons.lang3.SystemUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.apache.commons.lang3.SystemUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.firefox.FirefoxOptions;
@@ -22,6 +21,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.File;
+import java.time.Duration;
 
 class ReviewCreationPageObjectsWT extends AbstractWebTest {
 
@@ -37,24 +37,29 @@ class ReviewCreationPageObjectsWT extends AbstractWebTest {
   ReviewListPage reviewListPage = new ReviewListPage();
 
   @Container
-  static BrowserWebDriverContainer<?> webDriverContainer = new BrowserWebDriverContainer<>(
-    // Workaround to allow running the tests on an Apple M1
-    System.getProperty("os.arch").equals("aarch64") ?
-      DockerImageName.parse("seleniarm/standalone-firefox")
-        .asCompatibleSubstituteFor("selenium/standalone-firefox")
-      : DockerImageName.parse("selenium/standalone-firefox:4.3.0-20220726")
-  )
-    .withRecordingMode(BrowserWebDriverContainer.VncRecordingMode.RECORD_ALL, new File("./target"))
-    .withCapabilities(new FirefoxOptions());
+  static BrowserWebDriverContainer<?> webDriverContainer =
+      new BrowserWebDriverContainer<>(
+              // Workaround to allow running the tests on an Apple M1
+              System.getProperty("os.arch").equals("aarch64")
+                  ? DockerImageName.parse("seleniarm/standalone-firefox:latest")
+                      .asCompatibleSubstituteFor("selenium/standalone-firefox")
+                  : DockerImageName.parse("selenium/standalone-firefox:latest"))
+          .withRecordingMode(BrowserWebDriverContainer.VncRecordingMode.SKIP, new File("./target"))
+          .withCapabilities(new FirefoxOptions());
 
   private static final String ISBN = "9780321751041";
 
   @BeforeEach
   void setup() {
     Configuration.timeout = 2000;
-    Configuration.baseUrl = SystemUtils.IS_OS_LINUX ? "http://172.17.0.1:8080" : "http://host.docker.internal:8080";
+    // TODO: Improve platform independence, see Testcontainers.exposeHostPorts
+    // https://rieckpil.de/write-concise-web-tests-with-selenide-for-java-projects/
+    Configuration.baseUrl =
+        SystemUtils.IS_OS_LINUX ? "http://172.17.0.1:8080" : "http://host.docker.internal:8080";
 
-    RemoteWebDriver remoteWebDriver = webDriverContainer.getWebDriver();
+    RemoteWebDriver remoteWebDriver =
+        new RemoteWebDriver(webDriverContainer.getSeleniumAddress(), new FirefoxOptions(), false);
+    remoteWebDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(10));
     WebDriverRunner.setWebDriver(remoteWebDriver);
   }
 
@@ -66,6 +71,16 @@ class ReviewCreationPageObjectsWT extends AbstractWebTest {
 
   @Test
   void shouldCreateReviewAndDisplayItInReviewList() {
+    createBook();
+
+    String reviewTitle = "Great Book about Software Development with Java!";
+    String reviewContent =
+        "I really enjoyed reading this book. It contains great examples and discusses also advanced topics.";
+
+    dashboardPage.open();
+    loginPage.performLogin("duke", "dukeduke");
+    newReviewPage.submitReview(reviewTitle, reviewContent, 0, 4);
+    reviewListPage.shouldContainExactlyOneReview(reviewTitle, reviewContent);
   }
 
   private void createBook() {
@@ -76,7 +91,8 @@ class ReviewCreationPageObjectsWT extends AbstractWebTest {
     book.setTitle("Joyful testing with Spring Boot");
     book.setDescription("Writing unit and integration tests for Spring Boot applications");
     book.setAuthor("rieckpil");
-    book.setThumbnailUrl("https://rieckpil.de/wp-content/uploads/2020/08/tsbam_introduction_thumbnail-585x329.png.webp");
+    book.setThumbnailUrl(
+        "https://rieckpil.de/wp-content/uploads/2020/08/tsbam_introduction_thumbnail-585x329.png.webp");
     book.setGenre("Software Development");
 
     this.bookRepository.save(book);
