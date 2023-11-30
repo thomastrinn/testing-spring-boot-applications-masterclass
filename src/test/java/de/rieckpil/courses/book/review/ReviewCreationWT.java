@@ -4,12 +4,9 @@ import com.codeborne.selenide.CollectionCondition;
 import com.codeborne.selenide.Condition;
 import com.codeborne.selenide.Configuration;
 import com.codeborne.selenide.WebDriverRunner;
-import java.util.logging.Level;
-
 import de.rieckpil.courses.AbstractWebTest;
 import de.rieckpil.courses.book.management.Book;
 import de.rieckpil.courses.book.management.BookRepository;
-import org.apache.commons.lang3.SystemUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +18,7 @@ import org.openqa.selenium.remote.RemoteWebDriver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.testcontainers.containers.BrowserWebDriverContainer;
 import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.shaded.org.apache.commons.lang3.SystemUtils;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.File;
@@ -69,12 +67,16 @@ class ReviewCreationWT extends AbstractWebTest {
   void setup() {
     Configuration.timeout = 2000;
     // TODO: Improve platform independence, see Testcontainers.exposeHostPorts https://rieckpil.de/write-concise-web-tests-with-selenide-for-java-projects/
-    Configuration.baseUrl = SystemUtils.IS_OS_LINUX ? "http://172.17.0.1:8080" : "http://host.docker.internal:8080";
+    Configuration.baseUrl = getBaseUrl();
 
     RemoteWebDriver remoteWebDriver = webDriverContainer.getWebDriver();
     WebDriverRunner.setWebDriver(remoteWebDriver);
 
     createBook();
+  }
+
+  private static String getBaseUrl() {
+    return SystemUtils.IS_OS_LINUX ? "http://172.17.0.1:8080" : "http://host.docker.internal:8080";
   }
 
   @AfterEach
@@ -89,6 +91,53 @@ class ReviewCreationWT extends AbstractWebTest {
 
   @Test
   void shouldCreateReviewAndDisplayItInReviewList() {
+    assertNotNull(bookRepository);
+
+    open("/");
+
+    performLogin(new UserCredential("duke", "dukeduke"));
+    submitReview();
+    verifyReviewIsPartOfAllReviews();
+  }
+
+  private record UserCredential(String userName, String password) { }
+
+  private static void performLogin(UserCredential credential) {
+    $("button.ui").click();
+    $("#kc-login").should(Condition.appear);
+    $("#username").val(credential.userName);
+    $("#password").val(credential.password);
+    $("#kc-login").click();
+  }
+
+  private static void submitReview() {
+    $("#submit-review").should(Condition.appear);
+    $("#submit-review").click();
+
+    $("#review-submit").should(Condition.appear);
+    $("#book-selection").click();
+    $$(".visible .menu > div").get(0).click();
+    $$("#book-rating > i").get(4).click();
+
+    $("#review-title").val("Great Book about Software Development with Java!");
+    $("#review-content")
+      .val(
+        "I really enjoyed reading this book. It contains great examples and discusses also advanced topics.");
+
+    $("#review-submit").click();
+    $(".ui .success").should(Condition.appear);
+  }
+
+  private static void verifyReviewIsPartOfAllReviews() {
+    $("#all-reviews").click();
+    $("#reviews").should(Condition.appear);
+    $$("#reviews > div").shouldHave(CollectionCondition.size(1));
+    $("#review-0 .review-title")
+      .shouldHave(Condition.text("Great Book about Software Development with Java!"));
+    $("#review-0 .review-content")
+      .shouldHave(
+        Condition.text(
+          "I really enjoyed reading this book. It contains great examples and discusses also advanced topics."));
   }
 
   private void createBook() {
