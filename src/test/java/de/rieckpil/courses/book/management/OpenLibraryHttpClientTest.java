@@ -11,18 +11,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.support.WebClientAdapter;
+import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 import reactor.netty.http.client.HttpClient;
 
 import java.io.IOException;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class OpenLibraryApiClientTest {
-
-  private MockWebServer mockWebServer;
-  private OpenLibraryApiClient cut;
+class OpenLibraryHttpClientTest {
 
   private static final String ISBN = "9780596004651";
 
@@ -31,17 +29,21 @@ class OpenLibraryApiClientTest {
   static {
     try {
       VALID_RESPONSE = new String(Objects.requireNonNull(
-        OpenLibraryApiClientTest.class.getClassLoader()
-          .getResourceAsStream("stubs/openlibrary/success-" + ISBN + ".json"))
-          .readAllBytes()
+          OpenLibraryApiClientTest.class.getClassLoader()
+            .getResourceAsStream("stubs/openlibrary/success-" + ISBN + ".json"))
+        .readAllBytes()
       );
     } catch (IOException e) {
       e.printStackTrace();
     }
   }
 
+  private OpenLibraryHttpClient cut;
+
+  private MockWebServer mockWebServer;
+
   @BeforeEach
-  public void setup() throws IOException {
+  void setUp() throws IOException {
     mockWebServer = new MockWebServer();
     mockWebServer.start();
 
@@ -56,19 +58,19 @@ class OpenLibraryApiClientTest {
       .clientConnector(new ReactorClientHttpConnector(httpClient))
       .build();
 
-    cut = new OpenLibraryApiClient(webClient);
+    HttpServiceProxyFactory factory = HttpServiceProxyFactory.builder(WebClientAdapter.forClient(webClient)).build();
+    cut =  factory.createClient(OpenLibraryHttpClient.class);
   }
 
   @AfterEach
-  public void teardown() throws IOException {
+  void tearDown() throws IOException {
     if (mockWebServer != null) {
       mockWebServer.shutdown();
     }
   }
 
   @Test
-  void notNull() {
-    assertNotNull(mockWebServer);
+  void contextLoads() {
     assertNotNull(cut);
   }
 
@@ -80,7 +82,7 @@ class OpenLibraryApiClientTest {
 
     mockWebServer.enqueue(mockResponse);
 
-    Book result = cut.fetchMetadataForBook(ISBN);
+    Book result = cut.fetchBookByISBN(ISBN);
 
     assertNull(result.getId());
     assertEquals("9780596004651", result.getIsbn());
@@ -131,7 +133,7 @@ class OpenLibraryApiClientTest {
 
     mockWebServer.enqueue(mockResponse);
 
-    Book result = cut.fetchMetadataForBook(ISBN);
+    Book result = cut.fetchBookByISBN(ISBN);
 
     assertNull(result.getId());
     assertEquals("9780596004651", result.getIsbn());
@@ -158,32 +160,7 @@ class OpenLibraryApiClientTest {
       .setBody("Sorry, system is down :("));
 
     assertThrows(RuntimeException.class, () -> {
-      cut.fetchMetadataForBook(ISBN);
+      cut.fetchBookByISBN(ISBN);
     });
-  }
-
-  @Test
-  void shouldRetryWhenRemoteSystemIsSlowOrFailing() {
-    mockWebServer.enqueue(new MockResponse()
-      .setResponseCode(500)
-      .setBody("Sorry, system is down :("));
-
-    mockWebServer.enqueue(new MockResponse()
-      .addHeader("Content-Type", "application/json; charset=utf-8")
-      .setResponseCode(200)
-      .setBody(VALID_RESPONSE)
-      .setBodyDelay(2, TimeUnit.SECONDS)
-    );
-
-    mockWebServer.enqueue(new MockResponse()
-      .addHeader("Content-Type", "application/json; charset=utf-8")
-      .setResponseCode(200)
-      .setBody(VALID_RESPONSE)
-    );
-
-    Book result = cut.fetchMetadataForBook(ISBN);
-
-    assertNull(result.getId());
-    assertEquals("9780596004651", result.getIsbn());
   }
 }
